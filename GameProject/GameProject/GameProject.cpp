@@ -99,7 +99,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
 
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, 900, 600, nullptr, nullptr, hInstance, nullptr);
+      CW_USEDEFAULT, 0, 900, 650, nullptr, nullptr, hInstance, nullptr);
 
    if (!hWnd)
    {
@@ -126,27 +126,34 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 
 RECT GameLine;
-RECT AbilityLine;
-RECT ME;
+RECT StatLine;
+RECT ME_RECT;
 
+class Status {
+public:
+    //스텟
+    int HP;
+    int TotalHP;
+    int Power;
+    int Speed;
+    int SumExp;
+    int Exp;
 
-//ME 스텟
-int HP;
-int Power;
-int Speed;
-int SumExp;
-int Exp;
+};
 
-//ME 스텟 텍스트
+Status ME;
+
+//나의 체력 바 생성
+RECT HPBar;
+
+//나의 경험치 바 생성
+RECT ExpBar;
+
+//스텟 출력용 문자열
 wchar_t HPstr[2];
 wchar_t Powerstr[2];
 wchar_t Speedstr[2];
-wchar_t SumExpstr[2];
 wchar_t Expstr[2];
-
-
-
-
 
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -172,37 +179,50 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_CREATE:
     {
-        //GameLine 크기 설정
+        //GameLine 크기 설정 20~520, 70~570
         GameLine.left = 20;
-        GameLine.top = 20;
+        GameLine.top = 70;
         GameLine.right = 520;
-        GameLine.bottom = 520;
+        GameLine.bottom = 570;
 
-        //AbilityLine 크기 설정
-        AbilityLine.left = 550;
-        AbilityLine.top = 20;
-        AbilityLine.right = 800;
-        AbilityLine.bottom = 520;
+        //StatLine 크기 설정 550~800, 70~570
+        StatLine.left = 550;
+        StatLine.top = 70;
+        StatLine.right = 800;
+        StatLine.bottom = 570;
+
+        //HPBar 설정 20~120, 10~30
+        HPBar.left = 20;
+        HPBar.top = 10;
+        HPBar.right = 120;
+        HPBar.bottom = 30;
+
+        //ExpBar 설정 20~120, 40~60
+        ExpBar.left = 20;
+        ExpBar.top = 40;
+        ExpBar.right = 120;
+        ExpBar.bottom = 60;
 
         //ME 크기 설정
-        ME.left = 260;
-        ME.top = 260;
-        ME.right = 280;
-        ME.bottom = 280;
+        ME_RECT.left = 260;
+        ME_RECT.top = 260;
+        ME_RECT.right = 280;
+        ME_RECT.bottom = 280;
 
         //ME 기본스텟 설정
-        HP = 5;
-        Power = 1;
-        Speed = 5;
-        SumExp = 5;
-        Exp = 0;
+        ME.HP = 3;
+        ME.TotalHP = 5;
+        ME.Power = 1;
+        ME.Speed = 5;
+        ME.SumExp = 5;
+        ME.Exp = 0;
         
 
         //ME 기본스텟 텍스트 설정
-        wsprintfW(HPstr, L"%d", HP);
-        wsprintfW(Powerstr, L"%d", Power);
-        wsprintfW(Speedstr, L"%d", Speed);
-        wsprintfW(Expstr, L"%d / %d", Exp,SumExp);
+        wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
+        wsprintfW(Powerstr, L"%d", ME.Power);
+        wsprintfW(Speedstr, L"%d", ME.Speed);
+        wsprintfW(Expstr, L"%d / %d", ME.Exp,ME.SumExp);
 
     }
         break;
@@ -211,20 +231,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         switch (wParam)
         {
         case VK_LEFT:
-            ME.left -= Speed;
-            ME.right -= Speed;
+            ME_RECT.left -= ME.Speed;
+            ME_RECT.right -= ME.Speed;
             break;
         case VK_RIGHT:
-            ME.left += Speed;
-            ME.right += Speed;
+            ME_RECT.left += ME.Speed;
+            ME_RECT.right += ME.Speed;
             break;
         case VK_UP:
-            ME.top -= Speed;
-            ME.bottom -= Speed;
+            ME_RECT.top -= ME.Speed;
+            ME_RECT.bottom -= ME.Speed;
             break;
         case VK_DOWN:
-            ME.top += Speed;
-            ME.bottom += Speed;
+            ME_RECT.top += ME.Speed;
+            ME_RECT.bottom += ME.Speed;
             break;
         }
 
@@ -235,30 +255,54 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
+            HBRUSH my_brush, os_brush;
+
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
 
             //GameLine 선 그리기
             Rectangle(hdc, GameLine.left, GameLine.top, GameLine.right, GameLine.bottom);
 
-            //AbilityLine 선 그리기
-            Rectangle(hdc, AbilityLine.left, AbilityLine.top, AbilityLine.right, AbilityLine.bottom);
+            //StatLine 선 그리기
+            Rectangle(hdc, StatLine.left, StatLine.top, StatLine.right, StatLine.bottom);
 
-            //Ability 텍스트 출력
-            TextOut(hdc, 570, 50, L"체력", 2);
-            TextOut(hdc, 570, 80, L"데미지", 3);
-            TextOut(hdc, 570, 110, L"이동속도", 4);
-            TextOut(hdc, 570, 140, L"경험치", 3);
+           
 
 
-            //Ability
-            TextOut(hdc, 770, 50, HPstr, lstrlen(HPstr));
-            TextOut(hdc, 770, 80, Powerstr, lstrlen(Powerstr));
-            TextOut(hdc, 770, 110, Speedstr, lstrlen(Speedstr));
-            TextOut(hdc, 770, 140, Expstr, lstrlen(Expstr));
+
+            //HPBar 막대 그리기
+            Rectangle(hdc, HPBar.left, HPBar.top, HPBar.right, HPBar.bottom);
+            my_brush = CreateSolidBrush(RGB(255, 0, 0));
+            os_brush = (HBRUSH)SelectObject(hdc, my_brush);
+
+            //나중에 다른 case문으로 변경할내용
+            LONG HP2Bar = ((ME.HP * 100) / ME.TotalHP) + 20;
+
+            Rectangle(hdc, HPBar.left, HPBar.top, HP2Bar, HPBar.bottom);
+            SelectObject(hdc, os_brush);
+            DeleteObject(my_brush);
+
+
+
+
+            //ExpBar 막대 그리기
+            Rectangle(hdc, ExpBar.left, ExpBar.top, ExpBar.right, ExpBar.bottom);
+
+            //Stat 텍스트 출력
+            TextOut(hdc, 570, 100, L"체력", 2);
+            TextOut(hdc, 570, 130, L"데미지", 3);
+            TextOut(hdc, 570, 160, L"이동속도", 4);
+            TextOut(hdc, 570, 190, L"경험치", 3);
+
+
+            //Stat
+            TextOut(hdc, 720, 100, HPstr, lstrlen(HPstr));
+            TextOut(hdc, 720, 130, Powerstr, lstrlen(Powerstr));
+            TextOut(hdc, 720, 160, Speedstr, lstrlen(Speedstr));
+            TextOut(hdc, 720, 190, Expstr, lstrlen(Expstr));
 
 
             //ME 선 그리기
-            Rectangle(hdc, ME.left, ME.top, ME.right, ME.bottom);
+            Rectangle(hdc, ME_RECT.left, ME_RECT.top, ME_RECT.right, ME_RECT.bottom);
 
 
 
@@ -272,6 +316,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_DESTROY:
+        
         PostQuitMessage(0);
         break;
     default:
