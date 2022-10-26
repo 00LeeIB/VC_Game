@@ -211,18 +211,34 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
         //ME 기본스텟 설정
         ME.HP = 3;
-        ME.TotalHP = 5;
+        ME.TotalHP = 10;
         ME.Power = 1;
         ME.Speed = 5;
         ME.SumExp = 5;
         ME.Exp = 0;
         
+        //타이머 설정
+        SetTimer(hWnd, HPregenerate, 2000, NULL);
+
 
         //ME 기본스텟 텍스트 설정
         wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
         wsprintfW(Powerstr, L"%d", ME.Power);
         wsprintfW(Speedstr, L"%d", ME.Speed);
         wsprintfW(Expstr, L"%d / %d", ME.Exp,ME.SumExp);
+
+    }
+        break;
+    case WM_TIMER:
+    {
+        if (wParam == HPregenerate) {
+            if(ME.HP==ME.TotalHP){}
+            else {
+                ME.HP++;
+                wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
+                InvalidateRect(hWnd, NULL, true);
+            }
+        }
 
     }
         break;
@@ -266,9 +282,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             Rectangle(hdc, StatLine.left, StatLine.top, StatLine.right, StatLine.bottom);
 
            
-
-
-
             //HPBar 막대 그리기
             Rectangle(hdc, HPBar.left, HPBar.top, HPBar.right, HPBar.bottom);
             my_brush = CreateSolidBrush(RGB(255, 0, 0));
@@ -280,8 +293,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             Rectangle(hdc, HPBar.left, HPBar.top, HP2Bar, HPBar.bottom);
             SelectObject(hdc, os_brush);
             DeleteObject(my_brush);
-
-
 
 
             //ExpBar 막대 그리기
@@ -303,14 +314,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             //ME 선 그리기
             Rectangle(hdc, ME_RECT.left, ME_RECT.top, ME_RECT.right, ME_RECT.bottom);
-
-
-
-
-
-            
-
-
 
             EndPaint(hWnd, &ps);
         }
