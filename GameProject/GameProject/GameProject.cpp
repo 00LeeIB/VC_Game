@@ -156,27 +156,14 @@ wchar_t Speedstr[2];
 wchar_t Expstr[2];
 
 
+bool keyLayout[256];
+
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    
     switch (message)
     {
-    case WM_COMMAND:
-        {
-            int wmId = LOWORD(wParam);
-            // 메뉴 선택을 구문 분석합니다:
-            switch (wmId)
-            {
-            case IDM_ABOUT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
-            }
-        }
-        break;
     case WM_CREATE:
     {
         //GameLine 크기 설정 20~520, 70~570
@@ -236,37 +223,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             else {
                 ME.HP++;
                 wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
-                InvalidateRect(hWnd, NULL, true);
+                InvalidateRect(hWnd, nullptr, true);
             }
         }
+
 
     }
         break;
     case WM_KEYDOWN:
     {
-        switch (wParam)
-        {
-        case VK_LEFT:
-            ME_RECT.left -= ME.Speed;
-            ME_RECT.right -= ME.Speed;
-            break;
-        case VK_RIGHT:
-            ME_RECT.left += ME.Speed;
-            ME_RECT.right += ME.Speed;
-            break;
-        case VK_UP:
-            ME_RECT.top -= ME.Speed;
-            ME_RECT.bottom -= ME.Speed;
-            break;
-        case VK_DOWN:
-            ME_RECT.top += ME.Speed;
-            ME_RECT.bottom += ME.Speed;
-            break;
-        }
-
-        InvalidateRect(hWnd, NULL, true);
+        keyLayout[wParam] = 1;
     }
         break;
+    case WM_KEYUP:
+    {
+        keyLayout[wParam] = 0;
+    }
+        break;
+
     case WM_PAINT:
         {
             PAINTSTRUCT ps;
@@ -325,6 +299,34 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
+
+    if (wParam != NULL) {
+        if (keyLayout[VK_LEFT] == keyLayout[VK_RIGHT]) {
+
+        }
+        else if (keyLayout[VK_LEFT]) {
+            ME_RECT.left -= ME.Speed;
+            ME_RECT.right -= ME.Speed;
+
+        }
+        else {
+            ME_RECT.left += ME.Speed;
+            ME_RECT.right += ME.Speed;
+        }
+
+        if (keyLayout[VK_UP] == keyLayout[VK_DOWN]) {
+        }
+        else if (keyLayout[VK_UP]) {
+            ME_RECT.top -= ME.Speed;
+            ME_RECT.bottom -= ME.Speed;
+        }
+        else {
+            ME_RECT.top += ME.Speed;
+            ME_RECT.bottom += ME.Speed;
+        }
+        InvalidateRect(hWnd, nullptr, true);
+    }
+
     return 0;
 }
 
