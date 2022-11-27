@@ -3,11 +3,11 @@
 // GameProject.rc에서 사용되고 있습니다.
 //
 
-#define HPregenerate                    10
-#define ScreenReset						20
-#define ENEMY_Thread_Create				30
-#define AttackDelay_Timer				40
-#define GameTime						50
+#define HP_REGENERATE                   10
+#define SCREEN_RESET					20
+#define ENEMY_THREAD_CREATE				30
+#define ATTACK_DELAY_TIMER				40
+#define GAME_TIME						50
 
 #define IDC_MYICON                      2
 #define IDD_GAMEPROJECT_DIALOG          102
