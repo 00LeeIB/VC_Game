@@ -82,14 +82,25 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     MSG msg;
 
-    // 기본 메시지 루프입니다:
-    while (GetMessage(&msg, nullptr, 0, 0))
+
+    bool done = FALSE;
+
+    //Message Loop
+    while (!done)
     {
-        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            if (msg.message == WM_QUIT)
+                done = TRUE;
+            else
+            {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+                MoveCalc(msg.hwnd);
+            }
         }
+        else {}
+            //RenderTest();  //메세지가 없는 경우는 backbone형태로 이 함수가 수행됨.
     }
 
     return (int) msg.wParam;
@@ -186,8 +197,6 @@ void MoveCalc(HWND hWnd) {
         ME_RECT.top += ME.Speed;
         ME_RECT.bottom += ME.Speed;
     }
-
-    InvalidateRect(hWnd, nullptr, true);
 }
 
 DWORD WINAPI ENEMY_control(LPVOID param) {
@@ -246,7 +255,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         ME.HP = 3;
         ME.TotalHP = 10;
         ME.Power = 1;
-        ME.Speed = 5;
+        ME.Speed = 1;
         ME.SumExp = 5;
         ME.Exp = 0;
         
@@ -369,11 +378,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
-    }
-
-    if (wParam != NULL) {
-        MoveCalc(hWnd);
-        InvalidateRect(hWnd, nullptr, true);
     }
 
     return 0;
