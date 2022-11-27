@@ -90,13 +90,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     {
         if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
-            if (msg.message == WM_QUIT)
-                done = TRUE;
-            else
-            {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
-                MoveCalc(msg.hwnd);
+            if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
+                if (msg.message == WM_QUIT)
+                    done = TRUE;
+                else
+                {
+                    TranslateMessage(&msg);
+                    DispatchMessage(&msg);
+                    MoveCalc(msg.hwnd);
+                }
             }
         }
         else {}
@@ -178,35 +180,83 @@ void MoveCalc(HWND hWnd) {
 
     }
     else if (keyLayout[VK_LEFT]) {
-        ME_RECT.left -= ME.Speed;
-        ME_RECT.right -= ME.Speed;
-
+            ME_RECT.left -= ME.Speed;
+            ME_RECT.right -= ME.Speed;
     }
     else {
-        ME_RECT.left += ME.Speed;
-        ME_RECT.right += ME.Speed;
+            ME_RECT.left += ME.Speed;
+            ME_RECT.right += ME.Speed;
     }
 
     if (keyLayout[VK_UP] == keyLayout[VK_DOWN]) {
     }
     else if (keyLayout[VK_UP]) {
-        ME_RECT.top -= ME.Speed;
-        ME_RECT.bottom -= ME.Speed;
+            ME_RECT.top -= ME.Speed;
+            ME_RECT.bottom -= ME.Speed;
     }
     else {
-        ME_RECT.top += ME.Speed;
-        ME_RECT.bottom += ME.Speed;
+            ME_RECT.top += ME.Speed;
+            ME_RECT.bottom += ME.Speed;
     }
+    
+    //////
+
+    if (20 > ME_RECT.left)
+    {
+        ME_RECT.left = 20;
+        ME_RECT.right = 40;
+    }
+    if (70 > ME_RECT.top)
+    {
+        ME_RECT.top = 70;
+        ME_RECT.bottom = 90;
+    }
+    if (520 < ME_RECT.right)
+    {
+        ME_RECT.right = 520;
+        ME_RECT.left = 500;
+    }
+    if (570 < ME_RECT.bottom)
+    {
+        ME_RECT.bottom = 570;
+        ME_RECT.top = 550;
+    }
+
+
 }
 
 DWORD WINAPI ENEMY_control(LPVOID param) {
+    HWND hWnd = (HWND)param;
 
-    //HWND hWnd = (HWND)param;
 
-    for (int i = 0; i < 100; i++)
-    {
-        ENEMY_RECT.left -= ENEMY.Speed;
-        ENEMY_RECT.right -= ENEMY.Speed;
+
+    while (1) {
+        if (ME_RECT.left < ENEMY_RECT.left)
+        {
+            ENEMY_RECT.left -= 1;
+            ENEMY_RECT.right -= 1;
+        }
+        else if(ME_RECT.left > ENEMY_RECT.left)
+        {
+            ENEMY_RECT.left += 1;
+            ENEMY_RECT.right += 1;
+        }
+        else {
+
+        }
+        if (ME_RECT.top < ENEMY_RECT.top)
+        {
+            ENEMY_RECT.top -= 1;
+            ENEMY_RECT.bottom -= 1;
+        }
+        else if (ME_RECT.top > ENEMY_RECT.top)
+        {
+            ENEMY_RECT.top += 1;
+            ENEMY_RECT.bottom += 1;
+        }
+        else {
+
+        }
         Sleep(20);
     }
 
@@ -219,6 +269,25 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     
     switch (message)
     {
+    case WM_COMMAND:
+    {
+        switch (LOWORD(wParam))
+        {
+        case ID_LEFT:
+            keyLayout[VK_LEFT] = 1;
+            break;
+        case ID_RIGHT:
+            keyLayout[VK_RIGHT] = 1;
+            break;
+        case ID_DOWN:
+            keyLayout[VK_DOWN] = 1;
+            break;
+        case ID_UP:
+            keyLayout[VK_UP] = 1;
+            break;
+        }
+    }
+        break;
     case WM_CREATE:
     {
         //GameLine 크기 설정 20~520, 70~570
@@ -255,7 +324,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         ME.HP = 3;
         ME.TotalHP = 10;
         ME.Power = 1;
-        ME.Speed = 1;
+        ME.Speed = 3;
         ME.SumExp = 5;
         ME.Exp = 0;
         
@@ -273,7 +342,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         ENEMY.HP = 3;
         ENEMY.TotalHP = 10;
         ENEMY.Power = 1;
-        ENEMY.Speed = 1;
+        ENEMY.Speed = 3;
         ENEMY.SumExp = 5;
         ENEMY.Exp = 0;
 
@@ -283,7 +352,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         wsprintfW(Speedstr, L"%d", ME.Speed);
         wsprintfW(Expstr, L"%d / %d", ME.Exp,ME.SumExp);
 
-        CreateThread(NULL, 0, ENEMY_control, hWnd, 0, NULL);
+        DWORD tid;
+
+
+        CreateThread(NULL, 0, ENEMY_control, hWnd, 0, &tid);
+        CreateThread(NULL, 0, ENEMY_control, hWnd, 0, &tid);
 
 
 
@@ -296,7 +369,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             else {
                 ME.HP++;
                 wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
-                InvalidateRect(hWnd, nullptr, true);
+                
             }
         }
         if (wParam == 2) {
@@ -309,7 +382,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_KEYDOWN:
     {
-        keyLayout[wParam] = 1;
+        //keyLayout[wParam] = 1;
     }
         break;
     case WM_KEYUP:
