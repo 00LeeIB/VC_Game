@@ -1,2 +1,2 @@
 ﻿  GameProject.cpp
-  GameProject.vcxproj -> C:\Users\Homed\Desktop\Git-Project\VC_Proejct\GameProject\Debug\GameProject.exe
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(1941,5): error MSB6006: "rc.exe"이(가) 종료되었습니다(코드: -1073741510).

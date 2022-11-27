@@ -18,6 +18,45 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
+
+RECT GameLine;
+RECT StatLine;
+RECT ME_RECT;
+RECT ENEMY_RECT;
+
+class Status {
+public:
+    //스텟
+    int HP;
+    int TotalHP;
+    int Power;
+    int Speed;
+    int SumExp;
+    int Exp;
+
+};
+
+Status ME;
+Status ENEMY;
+
+//나의 체력 바 생성
+RECT HPBar;
+
+//나의 경험치 바 생성
+RECT ExpBar;
+
+//스텟 출력용 문자열
+wchar_t HPstr[2];
+wchar_t Powerstr[2];
+wchar_t Speedstr[2];
+wchar_t Expstr[2];
+
+
+bool keyLayout[256];
+
+void MoveCalc(HWND hWnd);
+
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPWSTR    lpCmdLine,
@@ -123,40 +162,47 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 //
 
+void MoveCalc(HWND hWnd) {
+    if (keyLayout[VK_LEFT] == keyLayout[VK_RIGHT]) {
 
+    }
+    else if (keyLayout[VK_LEFT]) {
+        ME_RECT.left -= ME.Speed;
+        ME_RECT.right -= ME.Speed;
 
-RECT GameLine;
-RECT StatLine;
-RECT ME_RECT;
+    }
+    else {
+        ME_RECT.left += ME.Speed;
+        ME_RECT.right += ME.Speed;
+    }
 
-class Status {
-public:
-    //스텟
-    int HP;
-    int TotalHP;
-    int Power;
-    int Speed;
-    int SumExp;
-    int Exp;
+    if (keyLayout[VK_UP] == keyLayout[VK_DOWN]) {
+    }
+    else if (keyLayout[VK_UP]) {
+        ME_RECT.top -= ME.Speed;
+        ME_RECT.bottom -= ME.Speed;
+    }
+    else {
+        ME_RECT.top += ME.Speed;
+        ME_RECT.bottom += ME.Speed;
+    }
 
-};
+    InvalidateRect(hWnd, nullptr, true);
+}
 
-Status ME;
+DWORD WINAPI ENEMY_control(LPVOID param) {
 
-//나의 체력 바 생성
-RECT HPBar;
+    //HWND hWnd = (HWND)param;
 
-//나의 경험치 바 생성
-RECT ExpBar;
+    for (int i = 0; i < 100; i++)
+    {
+        ENEMY_RECT.left -= ENEMY.Speed;
+        ENEMY_RECT.right -= ENEMY.Speed;
+        Sleep(20);
+    }
 
-//스텟 출력용 문자열
-wchar_t HPstr[2];
-wchar_t Powerstr[2];
-wchar_t Speedstr[2];
-wchar_t Expstr[2];
-
-
-bool keyLayout[256];
+    return 0;
+}
 
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -206,13 +252,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         
         //타이머 설정
         SetTimer(hWnd, HPregenerate, 2000, NULL);
+        SetTimer(hWnd, 2, 20, NULL);
 
+        //ENEMY 크기 설정
+        ENEMY_RECT.left = 160;
+        ENEMY_RECT.top = 160;
+        ENEMY_RECT.right = 180;
+        ENEMY_RECT.bottom = 180;
+
+        //ENEMY 기본스텟 설정
+        ENEMY.HP = 3;
+        ENEMY.TotalHP = 10;
+        ENEMY.Power = 1;
+        ENEMY.Speed = 1;
+        ENEMY.SumExp = 5;
+        ENEMY.Exp = 0;
 
         //ME 기본스텟 텍스트 설정
         wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
         wsprintfW(Powerstr, L"%d", ME.Power);
         wsprintfW(Speedstr, L"%d", ME.Speed);
         wsprintfW(Expstr, L"%d / %d", ME.Exp,ME.SumExp);
+
+        CreateThread(NULL, 0, ENEMY_control, hWnd, 0, NULL);
+
+
 
     }
         break;
@@ -226,10 +290,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 InvalidateRect(hWnd, nullptr, true);
             }
         }
+        if (wParam == 2) {
+            InvalidateRect(hWnd, nullptr, true);
+        }
 
 
     }
         break;
+
     case WM_KEYDOWN:
     {
         keyLayout[wParam] = 1;
@@ -289,6 +357,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             //ME 선 그리기
             Rectangle(hdc, ME_RECT.left, ME_RECT.top, ME_RECT.right, ME_RECT.bottom);
 
+            //ENEMY 선 그리기
+            Rectangle(hdc, ENEMY_RECT.left, ENEMY_RECT.top, ENEMY_RECT.right, ENEMY_RECT.bottom);
+
             EndPaint(hWnd, &ps);
         }
         break;
@@ -301,29 +372,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     }
 
     if (wParam != NULL) {
-        if (keyLayout[VK_LEFT] == keyLayout[VK_RIGHT]) {
-
-        }
-        else if (keyLayout[VK_LEFT]) {
-            ME_RECT.left -= ME.Speed;
-            ME_RECT.right -= ME.Speed;
-
-        }
-        else {
-            ME_RECT.left += ME.Speed;
-            ME_RECT.right += ME.Speed;
-        }
-
-        if (keyLayout[VK_UP] == keyLayout[VK_DOWN]) {
-        }
-        else if (keyLayout[VK_UP]) {
-            ME_RECT.top -= ME.Speed;
-            ME_RECT.bottom -= ME.Speed;
-        }
-        else {
-            ME_RECT.top += ME.Speed;
-            ME_RECT.bottom += ME.Speed;
-        }
+        MoveCalc(hWnd);
         InvalidateRect(hWnd, nullptr, true);
     }
 
