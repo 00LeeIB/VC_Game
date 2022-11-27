@@ -3,8 +3,13 @@
 
 #include "framework.h"
 #include "GameProject.h"
-#include<ctime>
-#include<cmath>
+
+using namespace std;
+
+Concurrency::concurrent_vector<RECT> v;
+Concurrency::concurrent_vector<RECT> v_enemy;
+Concurrency::concurrent_vector<ENEMY_Status> v_enemy_status;
+
 
 #define MAX_LOADSTRING 100
 
@@ -19,27 +24,12 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
-
 RECT GameLine;
 RECT StatLine;
 RECT ME_RECT;
 RECT ME_RANGE_RECT;
 
-class Status {
-public:
-    //스텟
-    int HP;
-    int TotalHP;
-    int Power;
-    double AttackSpeed;
-    int Speed;
-    int SumExp;
-    int Exp;
-    int Range;
-
-};
-
-Status ME;
+ME_Status ME;
 
 //나의 체력 바 생성
 RECT HPBar;
@@ -53,6 +43,13 @@ wchar_t Powerstr[10];
 wchar_t Speedstr[10];
 wchar_t Expstr[10];
 wchar_t GameTimestr[10];
+wchar_t Rangestr[10];
+wchar_t AttackSpeedstr[10];
+wchar_t Defensestr[10];
+wchar_t HPregenstr[10];
+wchar_t Levelstr[10];
+wchar_t button[3][10];
+
 
 
 bool keyLayout[256];
@@ -61,9 +58,20 @@ void MoveCalc(HWND hWnd);
 
 CRITICAL_SECTION g_cs;
 
-bool AttackDelay = true;
+bool ME_AttackDelay = true;
+bool ENEMY_AttackDelay = true;
 bool ENEMY_Thread_End = false;
-int GameTimeInt = 0;
+bool GameStop = false;
+bool LvUp_check[7];
+
+int GameTimeInt;
+int vcnt;
+int ENEMYvcnt;
+int g_dx, g_dy;
+int g_i;
+int enemy_vcnt;
+int Stat_Up;
+
 
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -94,6 +102,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     bool done = FALSE;
 
+    srand((unsigned int)time(NULL));
+
     //Message Loop
     while (!done)
     {
@@ -114,7 +124,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
         }
         else {}
-            //RenderTest();  //메세지가 없는 경우는 backbone형태로 이 함수가 수행됨.
         
     }
 
@@ -213,55 +222,142 @@ void MoveCalc(HWND hWnd) {
     }
 
 
-    if (20 > ME_RECT.left)
+    if (GameLine.left > ME_RECT.left)
     {
-        ME_RECT.left = 20;
-        ME_RECT.right = 40;
+        ME_RECT.left = GameLine.left;
+        ME_RECT.right = GameLine.left + 20;
     }
-    if (70 > ME_RECT.top)
+    if (GameLine.top > ME_RECT.top)
     {
-        ME_RECT.top = 70;
-        ME_RECT.bottom = 90;
+        ME_RECT.top = GameLine.top;
+        ME_RECT.bottom = GameLine.top + 20;
     }
-    if (520 < ME_RECT.right)
+    if (GameLine.right < ME_RECT.right)
     {
-        ME_RECT.right = 520;
-        ME_RECT.left = 500;
+        ME_RECT.left = GameLine.right - 20;
+        ME_RECT.right = GameLine.right;
     }
-    if (570 < ME_RECT.bottom)
+    if (GameLine.bottom < ME_RECT.bottom)
     {
-        ME_RECT.bottom = 570;
-        ME_RECT.top = 550;
+        ME_RECT.top = GameLine.bottom - 20;
+        ME_RECT.bottom = GameLine.bottom;
     }
 }
-RECT Attack_ENEMY;
 
 DWORD WINAPI ME_Attack(LPVOID param) {
+    HWND hWnd = (HWND)param;
+    RECT Attack_ENEMY;
+
+    Attack_ENEMY.left = ME_RECT.left + 5;
+    Attack_ENEMY.right = ME_RECT.right - 5;
+    Attack_ENEMY.top = ME_RECT.top + 5;
+    Attack_ENEMY.bottom = ME_RECT.bottom - 5;
+
+    v.push_back(Attack_ENEMY);
+    int tcnt = vcnt;
+    vcnt++;
+
+    int dx = g_dx;
+    int dy = g_dy;
+
+    int t_i = g_i;
+
     while (1) {
-        if (Attack_ENEMY.right == NULL) {
-            //공격X
+        if (GameStop == true)
+            continue;
+        if (v_enemy.at(t_i).left == 0) {
+            v.at(tcnt).left = 0;
+            v.at(tcnt).right = 0;
+            v.at(tcnt).top = 0;
+            v.at(tcnt).bottom = 0;
+            ExitThread(0);
+        }
+            
+        if (v_enemy.at(t_i).left < v.at(tcnt).left) {
+            v.at(tcnt).left -= 5;
+            v.at(tcnt).right -= 5;
+        }
+        else if (v_enemy.at(t_i).left > v.at(tcnt).left) {
+            v.at(tcnt).left += 5;
+            v.at(tcnt).right += 5;
         }
         else {
-            //공격
         }
+
+        if (v_enemy.at(t_i).top < v.at(tcnt).top) {
+            v.at(tcnt).top -= 5;
+            v.at(tcnt).bottom -= 5;
+        }
+        else if (v_enemy.at(t_i).top > v.at(tcnt).top) {
+            v.at(tcnt).top += 5;
+            v.at(tcnt).bottom += 5;
+        }
+        else {
+        }
+        Sleep(10);
+
+    }
+
+    ExitThread(0);
+    return 0;
+}
+
+DWORD WINAPI ME_Range(LPVOID param) {
+    HWND hWnd = (HWND)param;
+    while (1) {
+        if (GameStop == true)
+            continue;
+        ME_RANGE_RECT.left = ME_RECT.left - ME.Range;
+        ME_RANGE_RECT.right = ME_RECT.right + ME.Range;
+        ME_RANGE_RECT.top = ME_RECT.top - ME.Range;
+        ME_RANGE_RECT.bottom = ME_RECT.bottom + ME.Range;
+
+        if (ME_AttackDelay == true) {
+            for (int i = 0; i < v_enemy.size(); i++)
+            {
+                if (true == collisionEllipseCheck(v_enemy.at(i),ME_RANGE_RECT)) {
+                    if (ME_AttackDelay == true) {
+                        ME_AttackDelay = false;
+                        SetTimer(hWnd, ME_ATTACK_DELAY, ME.AttackSpeed, NULL);
+
+                        int enemy_x = v_enemy.at(i).right + v_enemy.at(i).left / 2;
+                        int enemy_y = v_enemy.at(i).bottom + v_enemy.at(i).top / 2;
+
+                        int me_x = ME_RECT.left + ME_RECT.right / 2;
+                        int me_y = ME_RECT.top + ME_RECT.bottom / 2;
+
+                        g_dx = enemy_x - me_x;
+                        g_dy = enemy_y - me_y;
+
+                        g_i = i;
+
+                        DWORD tid;
+                        CreateThread(NULL, 0, ME_Attack, hWnd, 0, &tid);
+                    }
+                }
+            }
+        }
+
     }
     return 0;
 }
+
+
 
 DWORD WINAPI ENEMY_control(LPVOID param) {
     HWND hWnd = (HWND)param;
 
     RECT ENEMY_RECT;
-    Status ENEMY;
-
-    HDC hdc = GetDC(hWnd);
+    ENEMY_Status ENEMY;
 
     srand((unsigned int)time(NULL));
 
-    ENEMY.TotalHP = GameTimeInt / 10 + 1;
-    ENEMY.Power = GameTimeInt / 10 + 1;
-    ENEMY.Speed = GameTimeInt / 20 + 1;
+    ENEMY.Level = GameTimeInt / 5;
+    ENEMY.TotalHP = GameTimeInt / 5 + 1;
     ENEMY.HP = ENEMY.TotalHP;
+    ENEMY.Power = GameTimeInt / 5 + 1;
+    ENEMY.Speed = GameTimeInt / 10 + 2;
+    
 
     //ENEMY 크기 설정
     ENEMY_RECT.left = 20 + rand() % 500;
@@ -269,53 +365,50 @@ DWORD WINAPI ENEMY_control(LPVOID param) {
     ENEMY_RECT.right = ENEMY_RECT.left + 20;
     ENEMY_RECT.bottom = ENEMY_RECT.top + 20;
 
+    v_enemy_status.push_back(ENEMY);
+    v_enemy.push_back(ENEMY_RECT);
+    int enemy_tcnt = enemy_vcnt;
+    enemy_vcnt++;
 
     while (1) {
-        if (ME_RECT.left < ENEMY_RECT.left)
+        if (GameStop == true)
+            continue;
+        if (ME_RECT.left < v_enemy.at(enemy_tcnt).left)
         {
-            ENEMY_RECT.left -= 1;
-            ENEMY_RECT.right -= 1;
+            v_enemy.at(enemy_tcnt).left -= ENEMY.Speed;
+            v_enemy.at(enemy_tcnt).right -= ENEMY.Speed;
         }
-        else if(ME_RECT.left > ENEMY_RECT.left)
+        else if(ME_RECT.left > v_enemy.at(enemy_tcnt).left)
         {
-            ENEMY_RECT.left += 1;
-            ENEMY_RECT.right += 1;
+            v_enemy.at(enemy_tcnt).left += ENEMY.Speed;
+            v_enemy.at(enemy_tcnt).right += ENEMY.Speed;
         }
         else {
 
         }
-        if (ME_RECT.top < ENEMY_RECT.top)
+        if (ME_RECT.top < v_enemy.at(enemy_tcnt).top)
         {
-            ENEMY_RECT.top -= 1;
-            ENEMY_RECT.bottom -= 1;
+            v_enemy.at(enemy_tcnt).top -= ENEMY.Speed;
+            v_enemy.at(enemy_tcnt).bottom -= ENEMY.Speed;
         }
-        else if (ME_RECT.top > ENEMY_RECT.top)
+        else if (ME_RECT.top > v_enemy.at(enemy_tcnt).top)
         {
-            ENEMY_RECT.top += 1;
-            ENEMY_RECT.bottom += 1;
+            v_enemy.at(enemy_tcnt).top += ENEMY.Speed;
+            v_enemy.at(enemy_tcnt).bottom += ENEMY.Speed;
         }
         else {
 
         }
-        Rectangle(hdc, ENEMY_RECT.left, ENEMY_RECT.top, ENEMY_RECT.right, ENEMY_RECT.bottom);
 
-        //테스트용 체력표시 
-        wchar_t test[10];
-        wsprintfW(test, L"%d", ENEMY.HP);
-        TextOut(hdc, ENEMY_RECT.left, ENEMY_RECT.top-10, test, lstrlen(test));
-        //
-
-        RECT is;
-        if (true == IntersectRect(&is, &ME_RECT, &ENEMY_RECT)) {
-            if (AttackDelay == true) {
-                ME.HP = ME.HP - ENEMY.Power;
-                AttackDelay = false;
-                SetTimer(hWnd, ATTACK_DELAY_TIMER, 1000, NULL);
+        if (true == collisionEllipseCheck(ME_RECT, v_enemy.at(enemy_tcnt))) { //피격
+            if (ENEMY_AttackDelay == true) {
+                ENEMY_AttackDelay = false;
+                if (ENEMY.Power > ME.Defense) 
+                    ME.HP = ME.HP - ENEMY.Power + ME.Defense;
+                SetTimer(hWnd, ENEMY_ATTACK_DELAY, 1000, NULL);
 
                 if (ME.HP <= 0) {
-                    EnterCriticalSection(&g_cs);
                     ENEMY_Thread_End = true;
-                    LeaveCriticalSection(&g_cs);
                     break;
                 }
                 wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
@@ -323,53 +416,72 @@ DWORD WINAPI ENEMY_control(LPVOID param) {
             }
             else {
             }
-        } //ENEMY_RECT 가 ME_RANGE 에 들어왔을 때
-        if (ENEMY_RECT.right <= ME_RANGE_RECT.right && ENEMY_RECT.left >= ME_RANGE_RECT.left
-            && ENEMY_RECT.bottom <= ME_RANGE_RECT.bottom && ENEMY_RECT.top >= ME_RANGE_RECT.top) {
+        } 
+
+        for (int i = 0; i < v.size(); i++)
+        {
+            if (true == collisionEllipseCheck(v_enemy.at(enemy_tcnt), v.at(i))) {//타격
+                ENEMY.HP -= ME.Power;
+                v.at(i).left = 0;
+                v.at(i).right = 0;
+                v.at(i).top = 0;
+                v.at(i).bottom = 0;
+            }
+            
+        }
+
+        if (ENEMY.HP <= 0) {
+            v_enemy.at(enemy_tcnt).left = 0;
+            v_enemy.at(enemy_tcnt).right = 0;
+            v_enemy.at(enemy_tcnt).top = 0;
+            v_enemy.at(enemy_tcnt).bottom = 0;
+            ME.Exp++;
             ExitThread(0);
         }
 
         if (ENEMY_Thread_End == true) {
             EnterCriticalSection(&g_cs);
             
-            ReleaseDC(hWnd, hdc);
             KillTimer(hWnd, HP_REGENERATE);
             KillTimer(hWnd, SCREEN_RESET);
             KillTimer(hWnd, ENEMY_THREAD_CREATE);
-            KillTimer(hWnd, ATTACK_DELAY_TIMER);
+            KillTimer(hWnd, ENEMY_ATTACK_DELAY);
 
-            MessageBox(hWnd, L"종료", L"사망", MB_OK);
+            MessageBox(hWnd, GameTimestr, L"종료", MB_OK);
             ExitThread(0);
             LeaveCriticalSection(&g_cs);
             return 0;
         }
 
-        Sleep(10);
+        Sleep(40);
     }
-    ReleaseDC(hWnd, hdc);
+
     ExitThread(0);
     return 0;
 }
 
+#define IDM_BTN_CLICK1   991
+#define IDM_BTN_CLICK2   992
+#define IDM_BTN_CLICK3   993
+#define IDM_BTN_CLICK4   994
+#define IDM_BTN_CLICK5   995
+#define IDM_BTN_CLICK6   996
+#define IDM_BTN_CLICK7   997
 
-DWORD WINAPI ME_Range(LPVOID param) {
-    HWND hWnd = (HWND)param;
+HWND g_button[3];
+int RandomStat[7][3] = { 0, };
+int checked;
 
-
-    while (1) {
-
-        ME_RANGE_RECT.left = ME_RECT.left - ME.Range;
-        ME_RANGE_RECT.right = ME_RECT.right + ME.Range;
-        ME_RANGE_RECT.top = ME_RECT.top - ME.Range;
-        ME_RANGE_RECT.bottom = ME_RECT.bottom + ME.Range;
-
-
-    }
-
-    return 0;
+void abc(HWND hWnd) {
+    GameStop = false;
+    SetTimer(hWnd, HP_REGENERATE, 2000, NULL);
+    SetTimer(hWnd, SCREEN_RESET, 20, NULL);
+    SetTimer(hWnd, ENEMY_THREAD_CREATE, 1000, NULL);
+    SetTimer(hWnd, GAME_TIME, 1000, NULL);
+    DestroyWindow(g_button[0]);
+    DestroyWindow(g_button[1]);
+    DestroyWindow(g_button[2]);
 }
-
-
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -380,6 +492,57 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         switch (LOWORD(wParam))
         {
+        case IDM_BTN_CLICK1:
+            for (int i = 0; i < 3; i++) {
+                if (RandomStat[0][i] != 0)
+                    ME.TotalHP += RandomStat[0][i];
+            }
+            abc(hWnd);
+            break;
+        case IDM_BTN_CLICK2:
+            for (int i = 0; i < 3; i++) {
+                if (RandomStat[1][i] != 0)
+                    ME.HPregen += RandomStat[1][i];
+            }
+            abc(hWnd);
+            break;
+        case IDM_BTN_CLICK3:
+            for (int i = 0; i < 3; i++) {
+                if (RandomStat[2][i] != 0)
+                    ME.Power += RandomStat[2][i];
+            }
+            abc(hWnd);
+            break;
+        case IDM_BTN_CLICK4:
+            for (int i = 0; i < 3; i++) {
+                if (RandomStat[3][i] != 0)
+                    ME.AttackSpeed -= RandomStat[3][i];
+            }
+            abc(hWnd);
+            break;
+        case IDM_BTN_CLICK5:
+            for (int i = 0; i < 3; i++) {
+                if (RandomStat[4][i] != 0)
+                    ME.Speed += RandomStat[4][i];
+            }
+            abc(hWnd);
+            break;
+        case IDM_BTN_CLICK6:
+            for (int i = 0; i < 3; i++) {
+                if (RandomStat[5][i] != 0)
+                    ME.Range += RandomStat[5][i];
+            }
+            abc(hWnd);
+            break;
+        case IDM_BTN_CLICK7:
+            for (int i = 0; i < 3; i++) {
+                if (RandomStat[6][i] != 0)
+                    ME.Defense += RandomStat[6][i];
+            }
+            abc(hWnd);
+            break;
+
+
         case ID_LEFT:
             keyLayout[VK_LEFT] = 1;
             break;
@@ -428,27 +591,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         ME_RECT.bottom = 280;
 
         //ME 기본스텟 설정
-        ME.HP = 3;
+        ME.Level = 0;
+        ME.HP = 10;
         ME.TotalHP = 10;
-        ME.Power = 1;
-        ME.AttackSpeed = 1;
+        ME.HPregen = 1;
+        ME.Power = 3;
+        ME.AttackSpeed = 1000;
         ME.Speed = 3;
-        ME.SumExp = 5;
-        ME.Exp = 0;
         ME.Range = 100;
+        ME.Defense = 0;
+        ME.Exp = 0;
+        ME.SumExp = 1;
+        
         
         //타이머 설정
-        SetTimer(hWnd, HP_REGENERATE, 2000, NULL);
+        SetTimer(hWnd, HP_REGENERATE, 1000, NULL);
         SetTimer(hWnd, SCREEN_RESET, 20, NULL);
         SetTimer(hWnd, ENEMY_THREAD_CREATE, 1000, NULL);
         SetTimer(hWnd, GAME_TIME, 1000, NULL);
 
         //ME 기본스텟 텍스트 설정
+        wsprintfW(Levelstr, L"%d", ME.Level);
         wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
+        wsprintfW(HPregenstr, L"%d", ME.HPregen);
         wsprintfW(Powerstr, L"%d", ME.Power);
+        wsprintfW(AttackSpeedstr, L"%d", ME.AttackSpeed);
         wsprintfW(Speedstr, L"%d", ME.Speed);
+        wsprintfW(Rangestr, L"%d", ME.Range);
+        wsprintfW(Defensestr, L"%d", ME.Defense);
         wsprintfW(Expstr, L"%d / %d", ME.Exp, ME.SumExp);
-
+        
         InitializeCriticalSection(&g_cs);
 
         CreateThread(NULL, 0, ME_Range, hWnd, 0, NULL);
@@ -466,12 +638,102 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (wParam == HP_REGENERATE) {
             if(ME.HP==ME.TotalHP){}
             else {
-                ME.HP++;
-                wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
-                
+                ME.HP = ME.HP + ME.HPregen;
+                if (ME.HP > ME.TotalHP)
+                    ME.HP = ME.TotalHP;
             }
         }
         if (wParam == SCREEN_RESET) {
+            wsprintfW(Levelstr, L"%d", ME.Level);
+            wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
+            wsprintfW(HPregenstr, L"%d", ME.HPregen);
+            wsprintfW(Powerstr, L"%d", ME.Power);
+            wsprintfW(AttackSpeedstr, L"%d", ME.AttackSpeed);
+            wsprintfW(Speedstr, L"%d", ME.Speed);
+            wsprintfW(Rangestr, L"%d", ME.Range);
+            wsprintfW(Defensestr, L"%d", ME.Defense);
+            wsprintfW(Expstr, L"%d / %d", ME.Exp, ME.SumExp);
+
+            if (ME.Exp >= ME.SumExp) {
+                ME.Level++;
+                ME.Exp = 0;
+                ME.SumExp += 1;
+                ME.HP = ME.TotalHP;
+
+                GameStop = true;
+
+                KillTimer(hWnd, HP_REGENERATE);
+                KillTimer(hWnd, SCREEN_RESET);
+                KillTimer(hWnd, ENEMY_THREAD_CREATE);
+                KillTimer(hWnd, GAME_TIME);
+
+                for (int i = 0; i < 7; i++) {
+                    LvUp_check[i] = true;
+                }
+
+                for (int i = 0; i < 7; i++)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        RandomStat[i][j] = 0;
+                    }
+                    
+                }
+
+                for (int i = 0; i < 3; i++)
+                {
+                    while (1) {
+                        Stat_Up = rand() % 7;
+                        if (ME.AttackSpeed <= 300 && Stat_Up == 3) {
+                            continue;
+                        }
+                        if (LvUp_check[Stat_Up] == true)
+                            break;
+                    }
+                    switch (Stat_Up)
+                    {
+                    case 0:
+                        RandomStat[0][i] = rand() % 5 + 3;
+                        wsprintfW(button[i], L"체력+%d",RandomStat[0][i]);
+                        LvUp_check[0] = false;
+                        break;
+                    case 1:
+                        RandomStat[1][i] = rand() % 3 + 2;
+                        wsprintfW(button[i], L"체력재생+%d", RandomStat[1][i]);
+                        LvUp_check[1] = false;
+                        break;
+                    case 2:
+                        RandomStat[2][i] = rand() % 3 + 1;
+                        wsprintfW(button[i], L"데미지+%d", RandomStat[2][i]);
+                        LvUp_check[2] = false;
+                        break;
+                    case 3:
+                        RandomStat[3][i] = (rand() % 3) * 50 + 200;
+                        wsprintfW(button[i], L"공격속도+%d", RandomStat[3][i]);
+                        LvUp_check[3] = false;
+                        break;
+                    case 4:
+                        RandomStat[4][i] = rand() % 5 + 1;
+                        wsprintfW(button[i], L"이동속도+%d", RandomStat[4][i]);
+                        LvUp_check[4] = false;
+                        break;
+                    case 5:
+                        RandomStat[5][i] = (rand() % 3) * 10 + 40;
+                        wsprintfW(button[i], L"사거리+%d", RandomStat[5][i]);
+                        LvUp_check[5] = false;
+                        break;
+                    case 6:
+                        RandomStat[6][i] = rand() % 3 + 1;
+                        wsprintfW(button[i], L"방어구+%d", RandomStat[6][i]);
+                        LvUp_check[6] = false;
+                        break;
+                    }
+
+                    g_button[i] = CreateWindow(L"button", button[i], WS_CHILD | WS_VISIBLE, 100 + i * 120, 310, 100, 50, hWnd, (HMENU)(991 + Stat_Up), hInst, NULL);
+                    
+                }
+                
+            }
             InvalidateRect(hWnd, nullptr, true);
         }
         if (wParam == ENEMY_THREAD_CREATE) {
@@ -479,9 +741,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             CreateThread(NULL, 0, ENEMY_control, hWnd, 0, &tid);
 
         }
-        if (wParam == ATTACK_DELAY_TIMER) {
-            AttackDelay = true;
-            KillTimer(hWnd, ATTACK_DELAY_TIMER);
+        if (wParam == ENEMY_ATTACK_DELAY) {
+            ENEMY_AttackDelay = true;
+            KillTimer(hWnd, ENEMY_ATTACK_DELAY);
+        }
+        if (wParam == ME_ATTACK_DELAY) {
+            ME_AttackDelay = true;
+            KillTimer(hWnd, ME_ATTACK_DELAY);
         }
 
 
@@ -508,8 +774,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
 
+            //ME_Range 선 그리기
+            my_pen = CreatePen(PS_NULL, 1, RGB(255, 0, 0));
+            os_pen = (HPEN)SelectObject(hdc, my_pen);
+            Ellipse(hdc, ME_RANGE_RECT.left, ME_RANGE_RECT.top, ME_RANGE_RECT.right, ME_RANGE_RECT.bottom);
+            SelectObject(hdc, os_pen);
+            DeleteObject(my_pen);
+
+
             //GameLine 선 그리기
             Rectangle(hdc, GameLine.left, GameLine.top, GameLine.right, GameLine.bottom);
+
+            
 
             //StatLine 선 그리기
             Rectangle(hdc, StatLine.left, StatLine.top, StatLine.right, StatLine.bottom);
@@ -528,31 +804,90 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             DeleteObject(my_brush);
 
 
+
             //ExpBar 막대 그리기
             Rectangle(hdc, ExpBar.left, ExpBar.top, ExpBar.right, ExpBar.bottom);
+            my_brush = CreateSolidBrush(RGB(0, 255, 0));
+            os_brush = (HBRUSH)SelectObject(hdc, my_brush);
+
+            //나중에 다른 case문으로 변경할내용
+            LONG EXP2Bar = ((ME.Exp * 100) / ME.SumExp) + 20;
+
+            Rectangle(hdc, ExpBar.left, ExpBar.top, EXP2Bar, ExpBar.bottom);
+            SelectObject(hdc, os_brush);
+            DeleteObject(my_brush);
+
 
             //Stat 텍스트 출력
-            TextOut(hdc, 570, 100, L"체력", 2);
-            TextOut(hdc, 570, 130, L"데미지", 3);
-            TextOut(hdc, 570, 160, L"이동속도", 4);
-            TextOut(hdc, 570, 190, L"경험치", 3);
-
+            int y = 100;
+            TextOut(hdc, 570, y, L"Level", 5);
+            TextOut(hdc, 570, y + 30, L"체력", 2);
+            TextOut(hdc, 570, y + 60, L"체력재생", 4);
+            TextOut(hdc, 570, y + 90, L"데미지", 3);
+            TextOut(hdc, 570, y + 120, L"공격속도", 4);
+            TextOut(hdc, 570, y + 150, L"이동속도", 4);
+            TextOut(hdc, 570, y + 180, L"사거리", 3);
+            TextOut(hdc, 570, y + 210, L"방어구", 3);
+            
 
             //Stat
-            TextOut(hdc, 720, 100, HPstr, lstrlen(HPstr));
-            TextOut(hdc, 720, 130, Powerstr, lstrlen(Powerstr));
-            TextOut(hdc, 720, 160, Speedstr, lstrlen(Speedstr));
-            TextOut(hdc, 720, 190, Expstr, lstrlen(Expstr));
-
+            TextOut(hdc, 720, y, Levelstr, lstrlen(Levelstr));
+            TextOut(hdc, 720, y + 30, HPstr, lstrlen(HPstr));
+            TextOut(hdc, 720, y + 60, HPregenstr, lstrlen(HPregenstr));
+            TextOut(hdc, 720, y + 90, Powerstr, lstrlen(Powerstr));
+            TextOut(hdc, 720, y + 120, AttackSpeedstr, lstrlen(AttackSpeedstr));
+            TextOut(hdc, 720, y + 150, Speedstr, lstrlen(Speedstr));
+            TextOut(hdc, 720, y + 180, Rangestr, lstrlen(Rangestr));
+            TextOut(hdc, 720, y + 210, Defensestr, lstrlen(Defensestr));
+            
             //GameTime
             TextOut(hdc, 500, 50, GameTimestr, lstrlen(GameTimestr));
 
-            Rectangle(hdc, ME_RANGE_RECT.left, ME_RANGE_RECT.top, ME_RANGE_RECT.right, ME_RANGE_RECT.bottom);
-
             //ME 선 그리기
-            Rectangle(hdc, ME_RECT.left, ME_RECT.top, ME_RECT.right, ME_RECT.bottom);
+            Ellipse(hdc, ME_RECT.left, ME_RECT.top, ME_RECT.right, ME_RECT.bottom);
 
+            //ME_Attack 선그리기
+            for (int i = 0; i < v.size(); i++)
+            {
+                Ellipse(hdc, v.at(i).left, v.at(i).top, v.at(i).right, v.at(i).bottom);
+            }
             
+            //ENEMY 선그리기
+            for (int i = 0; i < v_enemy_status.size(); i++)
+            {
+                switch (v_enemy_status.at(i).Level) //레벨에 맞는 색
+                {
+                case 0:
+                    my_brush = CreateSolidBrush(RGB(255, 0, 0));
+                    break;
+                case 1:
+                    my_brush = CreateSolidBrush(RGB(255, 140, 0));
+                    break;
+                case 2:
+                    my_brush = CreateSolidBrush(RGB(255, 255, 0));
+                    break;
+                case 3:
+                    my_brush = CreateSolidBrush(RGB(0, 128, 0));
+                    break;
+                case 4:
+                    my_brush = CreateSolidBrush(RGB(0, 0, 255));
+                    break;
+                case 5:
+                    my_brush = CreateSolidBrush(RGB(75, 0, 130));
+                    break;
+                case 6:
+                    my_brush = CreateSolidBrush(RGB(128, 0, 128));
+                    break;
+                default:
+                    my_brush = CreateSolidBrush(RGB(256, 256, 256));
+                    break;
+                }
+                os_brush = (HBRUSH)SelectObject(hdc, my_brush);
+                Ellipse(hdc, v_enemy.at(i).left, v_enemy.at(i).top, v_enemy.at(i).right, v_enemy.at(i).bottom);
+                SelectObject(hdc, os_brush);
+                DeleteObject(my_brush);
+            }
+
 
             EndPaint(hWnd, &ps);
         }

@@ -13,5 +13,9 @@
 #include <malloc.h>
 #include <memory.h>
 #include <tchar.h>
+#include <ctime>
+#include <cmath>
+#include <vector>
+#include <concurrent_vector.h>
 
 
