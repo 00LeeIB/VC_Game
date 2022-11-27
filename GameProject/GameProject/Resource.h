@@ -2,7 +2,13 @@
 // Microsoft Visual C++에서 생성한 포함 파일입니다.
 // GameProject.rc에서 사용되고 있습니다.
 //
-#define HPregenerate                    1
+
+#define HPregenerate                    10
+#define ScreenReset						20
+#define ENEMY_Thread_Create				30
+#define AttackDelay_Timer				40
+#define GameTime						50
+
 #define IDC_MYICON                      2
 #define IDD_GAMEPROJECT_DIALOG          102
 #define IDS_APP_TITLE                   103

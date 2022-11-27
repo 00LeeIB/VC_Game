@@ -4,6 +4,7 @@
 #include "framework.h"
 #include "GameProject.h"
 #include<ctime>
+#include<cmath>
 
 #define MAX_LOADSTRING 100
 
@@ -30,6 +31,7 @@ public:
     int HP;
     int TotalHP;
     int Power;
+    double AttackSpeed;
     int Speed;
     int SumExp;
     int Exp;
@@ -37,7 +39,6 @@ public:
 };
 
 Status ME;
-Status ENEMY;
 
 //나의 체력 바 생성
 RECT HPBar;
@@ -46,16 +47,25 @@ RECT HPBar;
 RECT ExpBar;
 
 //스텟 출력용 문자열
-wchar_t HPstr[2];
-wchar_t Powerstr[2];
-wchar_t Speedstr[2];
-wchar_t Expstr[2];
+wchar_t HPstr[10];
+wchar_t Powerstr[10];
+wchar_t Speedstr[10];
+wchar_t Expstr[10];
+wchar_t GameTimestr[10];
 
 
 bool keyLayout[256];
 
 void MoveCalc(HWND hWnd);
 
+CRITICAL_SECTION g_cs;
+
+bool ME_AttackDelay = true;
+bool AttackDelay = true;
+bool ENEMY_Thread_End = false;
+int GameTimeInt = 0;
+
+RECT ME_Attack_RECT;
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -95,7 +105,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                     done = TRUE;
                 else
                 {
-                    TranslateMessage(&msg);
+                    //TranslateMessage(&msg);
                     DispatchMessage(&msg);
                     MoveCalc(msg.hwnd);
                 }
@@ -103,6 +113,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
         else {}
             //RenderTest();  //메세지가 없는 경우는 backbone형태로 이 함수가 수행됨.
+        
     }
 
     return (int) msg.wParam;
@@ -198,8 +209,7 @@ void MoveCalc(HWND hWnd) {
             ME_RECT.top += ME.Speed;
             ME_RECT.bottom += ME.Speed;
     }
-    
-    //////
+
 
     if (20 > ME_RECT.left)
     {
@@ -221,20 +231,23 @@ void MoveCalc(HWND hWnd) {
         ME_RECT.bottom = 570;
         ME_RECT.top = 550;
     }
-
-    
 }
 
-CRITICAL_SECTION g_cs;
-
-bool AttackDelay = true;
 
 DWORD WINAPI ENEMY_control(LPVOID param) {
     HWND hWnd = (HWND)param;
 
     RECT ENEMY_RECT;
+    Status ENEMY;
+
+    HDC hdc = GetDC(hWnd);
 
     srand((unsigned int)time(NULL));
+
+    ENEMY.TotalHP = GameTimeInt / 10 + 1;
+    ENEMY.Power = GameTimeInt / 10 + 1;
+    ENEMY.Speed = GameTimeInt / 20 + 1;
+    ENEMY.HP = ENEMY.TotalHP;
 
     //ENEMY 크기 설정
     ENEMY_RECT.left = 20 + rand() % 500;
@@ -242,7 +255,6 @@ DWORD WINAPI ENEMY_control(LPVOID param) {
     ENEMY_RECT.right = ENEMY_RECT.left + 20;
     ENEMY_RECT.bottom = ENEMY_RECT.top + 20;
 
-    HDC hdc = GetDC(hWnd);
 
     while (1) {
         if (ME_RECT.left < ENEMY_RECT.left)
@@ -275,31 +287,83 @@ DWORD WINAPI ENEMY_control(LPVOID param) {
         RECT is;
         if (true == IntersectRect(&is, &ME_RECT, &ENEMY_RECT)) {
             if (AttackDelay == true) {
-                ME.HP = ME.HP - 2;
+                ME.HP = ME.HP - ENEMY.Power;
                 AttackDelay = false;
-                SetTimer(hWnd, 5, 1000, NULL);
+                SetTimer(hWnd, AttackDelay_Timer, 1000, NULL);
 
                 if (ME.HP <= 0) {
+                    EnterCriticalSection(&g_cs);
+                    ENEMY_Thread_End = true;
+                    LeaveCriticalSection(&g_cs);
                     break;
                 }
                 wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
                 InvalidateRect(hWnd, nullptr, true);
             }
             else {
-
             }
-            
         }
+
+        if (true == IntersectRect(&is, &ENEMY_RECT, &ME_Attack_RECT)) {
+            if (ME_AttackDelay == true) {
+                ENEMY.HP = ENEMY.HP - ME.Power;
+                ME_AttackDelay = false;
+
+                DWORD tid;
+                LPVOID lpvoidtime;
+                CreateThread(NULL, 0, ME_Attack_Delay, lpvoidtime, 0, &tid);
+
+                if (ENEMY.HP <= 0) {
+                    ReleaseDC(hWnd, hdc);
+                    ExitThread(0);
+                    return 0;
+                }
+            }
+        }
+
+        if (ENEMY_Thread_End == true) {
+            EnterCriticalSection(&g_cs);
+            
+            ReleaseDC(hWnd, hdc);
+
+            KillTimer(hWnd, HPregenerate);
+            KillTimer(hWnd, ScreenReset);
+            KillTimer(hWnd, ENEMY_Thread_Create);
+            KillTimer(hWnd, AttackDelay_Timer);
+
+            MessageBox(hWnd, L"종료", L"사망", MB_OK);
+            ExitThread(0);
+            LeaveCriticalSection(&g_cs);
+            return 0;
+        }
+
         Sleep(10);
     }
-
-
-
     ReleaseDC(hWnd, hdc);
     ExitThread(0);
     return 0;
 }
+DWORD WINAPI ME_Attack_Delay(LPVOID param) {
+    Sleep(1000);
 
+    return 0;
+}
+
+
+
+DWORD WINAPI ME_Attack(LPVOID param) {
+    HWND hWnd = (HWND)param;
+    
+
+    while (1) {
+        ME_Attack_RECT.left = ME_RECT.left - 40;
+        ME_Attack_RECT.right = ME_RECT.right + 40;
+        ME_Attack_RECT.bottom = ME_RECT.bottom + 40;
+        ME_Attack_RECT.top = ME_RECT.top - 40;
+    }
+   
+    return 0;
+}
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -361,40 +425,38 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         ME.HP = 3;
         ME.TotalHP = 10;
         ME.Power = 1;
+        ME.AttackSpeed = 1;
         ME.Speed = 3;
         ME.SumExp = 5;
         ME.Exp = 0;
         
         //타이머 설정
         SetTimer(hWnd, HPregenerate, 2000, NULL);
-        SetTimer(hWnd, 2, 20, NULL);
-        SetTimer(hWnd, 4, 1000, NULL);
-
-        
-
-        //ENEMY 기본스텟 설정
-        ENEMY.HP = 3;
-        ENEMY.TotalHP = 10;
-        ENEMY.Power = 1;
-        ENEMY.Speed = 3;
-        ENEMY.SumExp = 5;
-        ENEMY.Exp = 0;
+        SetTimer(hWnd, ScreenReset, 20, NULL);
+        SetTimer(hWnd, ENEMY_Thread_Create, 1000, NULL);
+        SetTimer(hWnd, GameTime, 1000, NULL);
 
         //ME 기본스텟 텍스트 설정
         wsprintfW(HPstr, L"%d / %d", ME.HP, ME.TotalHP);
         wsprintfW(Powerstr, L"%d", ME.Power);
         wsprintfW(Speedstr, L"%d", ME.Speed);
-        wsprintfW(Expstr, L"%d / %d", ME.Exp,ME.SumExp);
+        wsprintfW(Expstr, L"%d / %d", ME.Exp, ME.SumExp);
 
         InitializeCriticalSection(&g_cs);
 
-
+        DWORD tid;
+        CreateThread(NULL, 0, ME_Attack, hWnd, 0, &tid);
 
 
     }
         break;
     case WM_TIMER:
     {
+        if (wParam == GameTime) {
+            wsprintfW(GameTimestr, L"%d", GameTimeInt);
+            GameTimeInt++;
+            
+        }
         if (wParam == HPregenerate) {
             if(ME.HP==ME.TotalHP){}
             else {
@@ -403,18 +465,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 
             }
         }
-        if (wParam == 2) {
+        if (wParam == ScreenReset) {
             InvalidateRect(hWnd, nullptr, true);
         }
-        if (wParam == 4) {
+        if (wParam == ENEMY_Thread_Create) {
             DWORD tid;
-
             CreateThread(NULL, 0, ENEMY_control, hWnd, 0, &tid);
 
         }
-        if (wParam == 5) {
+        if (wParam == AttackDelay_Timer) {
             AttackDelay = true;
-            KillTimer(hWnd, 5);
+            KillTimer(hWnd, AttackDelay_Timer);
         }
 
 
@@ -437,6 +498,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             HBRUSH my_brush, os_brush;
+            HPEN my_pen, os_pen;
 
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
 
@@ -476,19 +538,29 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             TextOut(hdc, 720, 160, Speedstr, lstrlen(Speedstr));
             TextOut(hdc, 720, 190, Expstr, lstrlen(Expstr));
 
+            //GameTime
+            TextOut(hdc, 500, 50, GameTimestr, lstrlen(GameTimestr));
+
+
+            //ME_Attack 투명선 그리기
+            //my_pen = CreatePen(PS_NULL, 1, RGB(0, 0, 0));
+            //os_pen = (HPEN)SelectObject(hdc, my_pen);
+            Rectangle(hdc, ME_Attack_RECT.left, ME_Attack_RECT.top, ME_Attack_RECT.right, ME_Attack_RECT.bottom);
+            //SelectObject(hdc, os_pen);
+            //DeleteObject(my_pen);
+
 
             //ME 선 그리기
             Rectangle(hdc, ME_RECT.left, ME_RECT.top, ME_RECT.right, ME_RECT.bottom);
 
-            //ENEMY 선 그리기
-            //Rectangle(hdc, ENEMY_RECT.left, ENEMY_RECT.top, ENEMY_RECT.right, ENEMY_RECT.bottom);
+            
 
             EndPaint(hWnd, &ps);
         }
         break;
     case WM_DESTROY:
     {
-        MessageBox(hWnd, L"종료", L"사망", MB_OK);
+        
         DeleteCriticalSection(&g_cs);
         PostQuitMessage(0);
     }
